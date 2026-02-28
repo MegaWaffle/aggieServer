@@ -17,7 +17,6 @@ const wss = new WebSocket.Server({ server });
 // In-memory storage
 let tutors = [];
 let tutorSockets = {};   // tutorName (lowercase) -> ws
-let students = [];
 let studentSockets = {}; // studentName (lowercase) -> ws
 let sessions = [];
 
@@ -28,6 +27,7 @@ wss.on("connection", (ws) => {
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
+      console.log("Received WS message:", data);
 
       // Register tutor
       if (data.type === "registerTutor" && data.tutorName) {
@@ -48,7 +48,10 @@ wss.on("connection", (ws) => {
       // Tutor response: accept or reject session
       if (data.type === "tutorResponse" && data.sessionId && data.status) {
         const session = sessions.find((s) => s.id === data.sessionId);
-        if (!session) return;
+        if (!session) {
+          console.log("Session not found:", data.sessionId);
+          return;
+        }
 
         // Relay response to student if connected
         const studentWs = studentSockets[session.studentName.toLowerCase()];
@@ -59,13 +62,21 @@ wss.on("connection", (ws) => {
             sessionId: session.id,
             tutorName: session.tutorName,
             course: session.course,
+            sessionCode: data.sessionCode || null,
           }));
           console.log(`Relayed tutor response (${data.status}) to ${session.studentName}`);
+        } else {
+          console.log(`Student ${session.studentName} not connected, response queued`);
         }
       }
 
+      // Optional: ping/pong to keep WS alive
+      if (data.type === "ping") {
+        ws.send(JSON.stringify({ type: "pong" }));
+      }
+
     } catch (err) {
-      console.log("Invalid WS message:", message);
+      console.log("Invalid WS message:", message, err);
     }
   });
 
