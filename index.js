@@ -17,9 +17,9 @@ let tutors = [];
 app.post("/addTutor", (req, res) => {
   const { tutor } = req.body;
 
-  if (!tutor || !tutor.name || typeof tutor.active !== "boolean") {
+  if (!tutor || !tutor.name) {
     return res.status(400).json({
-      error: "Tutor must include name (string) and active (boolean)"
+      error: "Tutor must include name (string) and other fields i guess"
     });
   }
 
