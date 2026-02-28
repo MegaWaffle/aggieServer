@@ -1,3 +1,4 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
@@ -7,23 +8,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Use Render's dynamic port
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
-// ---------------------- WebSocket Server ----------------------
+// ---------------- WebSocket Server ----------------
 const wss = new WebSocket.Server({ server });
 
 // In-memory storage
 let tutors = [];
-let tutorSockets = {}; // tutorName -> ws socket
+let tutorSockets = {};   // tutorName (lowercase) -> ws
+let students = [];
+let studentSockets = {}; // studentName (lowercase) -> ws
 let sessions = [];
 
-// ---------------------- WS Logic ----------------------
+// ---------------- WebSocket Logic ----------------
 wss.on("connection", (ws) => {
   console.log("New client connected");
 
-  // Expect first message to be tutor registration
   ws.on("message", (message) => {
     try {
       const data = JSON.parse(message);
@@ -35,6 +36,34 @@ wss.on("connection", (ws) => {
         ws.tutorName = nameKey;
         console.log(`Tutor registered: ${data.tutorName}`);
       }
+
+      // Register student
+      if (data.type === "registerStudent" && data.studentName) {
+        const nameKey = data.studentName.toLowerCase();
+        studentSockets[nameKey] = ws;
+        ws.studentName = nameKey;
+        console.log(`Student registered: ${data.studentName}`);
+      }
+
+      // Tutor response: accept or reject session
+      if (data.type === "tutorResponse" && data.sessionId && data.status) {
+        const session = sessions.find((s) => s.id === data.sessionId);
+        if (!session) return;
+
+        // Relay response to student if connected
+        const studentWs = studentSockets[session.studentName.toLowerCase()];
+        if (studentWs && studentWs.readyState === WebSocket.OPEN) {
+          studentWs.send(JSON.stringify({
+            type: "tutorResponse",
+            status: data.status, // "accepted" or "rejected"
+            sessionId: session.id,
+            tutorName: session.tutorName,
+            course: session.course,
+          }));
+          console.log(`Relayed tutor response (${data.status}) to ${session.studentName}`);
+        }
+      }
+
     } catch (err) {
       console.log("Invalid WS message:", message);
     }
@@ -45,31 +74,14 @@ wss.on("connection", (ws) => {
       console.log(`Tutor disconnected: ${ws.tutorName}`);
       delete tutorSockets[ws.tutorName];
     }
+    if (ws.studentName && studentSockets[ws.studentName] === ws) {
+      console.log(`Student disconnected: ${ws.studentName}`);
+      delete studentSockets[ws.studentName];
+    }
   });
 });
 
-// ---------------------- Helper: deactivate expired tutors ----------------------
-// function deactivateExpiredTutors() {
-//   const now = new Date();
-//   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-//   tutors.forEach((tutor) => {
-//     if (tutor.active && tutor.activeUntil) {
-//       const [hour, minute] = tutor.activeUntil.split(":").map(Number);
-//       const activeUntilMinutes = hour * 60 + minute;
-
-//       if (currentMinutes >= activeUntilMinutes) {
-//         tutor.active = false;
-//         console.log(`Tutor ${tutor.name} deactivated (past activeUntil)`);
-//       }
-//     }
-//   });
-// }
-
-// // Run every minute
-// setInterval(deactivateExpiredTutors, 60 * 1000);
-
-// ---------------------- REST API ----------------------
+// ---------------- REST API ----------------
 
 // Add or update tutor
 app.post("/addTutor", (req, res) => {
@@ -102,7 +114,7 @@ app.get("/tutors", (req, res) => {
   res.json(tutors);
 });
 
-// Receive student session request and relay to tutor app
+// Request a session (student -> tutor)
 app.post("/requestSession", (req, res) => {
   const { studentName, tutorName, course, requestedMinutes, location } = req.body;
 
@@ -110,32 +122,27 @@ app.post("/requestSession", (req, res) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-
   const tutor = tutors.find((t) => t.name.toLowerCase() === tutorName.toLowerCase());
   if (!tutor) return res.status(404).json({ error: "Tutor not found" });
   if (!tutor.active) return res.status(400).json({ error: "Tutor is currently inactive" });
   if (!tutor.subjects.includes(course)) return res.status(400).json({ error: "Tutor does not teach this course" });
 
-  // Check if tutor has enough time left
-  // if (tutor.activeUntil) {
-  //   const [hour, minute] = tutor.activeUntil.split(":").map(Number);
-  //   const now = new Date();
-  //   const activeUntilDate = new Date();
-  //   activeUntilDate.setHours(hour, minute, 0, 0);
-
-  //   const remainingMinutes = Math.floor((activeUntilDate - now) / (1000 * 60));
-  //   if (remainingMinutes < requestedMinutes) {
-  //     return res.status(400).json({ error: "Tutor does not have enough active time left" });
-  //   }
-  // }
-
-  const session = { studentName, tutorName, course, requestedMinutes, location, timestamp: new Date() };
+  // Create session with unique ID
+  const session = {
+    id: Date.now().toString(),
+    studentName,
+    tutorName,
+    course,
+    requestedMinutes,
+    location,
+    timestamp: new Date(),
+  };
   sessions.push(session);
 
-  // Relay via WS if connected
-  const ws = tutorSockets[tutorName.toLowerCase()];
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "newSessionRequest", session }));
+  // Relay to tutor if connected
+  const tutorWs = tutorSockets[tutorName.toLowerCase()];
+  if (tutorWs && tutorWs.readyState === WebSocket.OPEN) {
+    tutorWs.send(JSON.stringify({ type: "newSessionRequest", session }));
     console.log(`Relayed session request to ${tutorName}`);
   } else {
     console.log(`Tutor ${tutorName} not connected, request queued`);
@@ -149,7 +156,7 @@ app.get("/sessions", (req, res) => {
   res.json(sessions);
 });
 
-// ---------------------- Start Server ----------------------
+// ---------------- Start Server ----------------
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
