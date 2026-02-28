@@ -49,25 +49,25 @@ wss.on("connection", (ws) => {
 });
 
 // ---------------------- Helper: deactivate expired tutors ----------------------
-function deactivateExpiredTutors() {
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+// function deactivateExpiredTutors() {
+//   const now = new Date();
+//   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  tutors.forEach((tutor) => {
-    if (tutor.active && tutor.activeUntil) {
-      const [hour, minute] = tutor.activeUntil.split(":").map(Number);
-      const activeUntilMinutes = hour * 60 + minute;
+//   tutors.forEach((tutor) => {
+//     if (tutor.active && tutor.activeUntil) {
+//       const [hour, minute] = tutor.activeUntil.split(":").map(Number);
+//       const activeUntilMinutes = hour * 60 + minute;
 
-      if (currentMinutes >= activeUntilMinutes) {
-        tutor.active = false;
-        console.log(`Tutor ${tutor.name} deactivated (past activeUntil)`);
-      }
-    }
-  });
-}
+//       if (currentMinutes >= activeUntilMinutes) {
+//         tutor.active = false;
+//         console.log(`Tutor ${tutor.name} deactivated (past activeUntil)`);
+//       }
+//     }
+//   });
+// }
 
-// Run every minute
-setInterval(deactivateExpiredTutors, 60 * 1000);
+// // Run every minute
+// setInterval(deactivateExpiredTutors, 60 * 1000);
 
 // ---------------------- REST API ----------------------
 
