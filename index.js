@@ -12,15 +12,25 @@ let tutors = [];
 
 /**
  * POST /addTutor
- * Adds a tutor or updates their active status
+ * Adds a tutor or updates their active status and activeUntil time
  */
 app.post("/addTutor", (req, res) => {
   const { tutor } = req.body;
 
   if (!tutor || !tutor.name) {
     return res.status(400).json({
-      error: "Tutor must include name (string) and other fields i guess"
+      error: "Tutor must include name (string) and other fields"
     });
+  }
+
+  // Validate activeUntil if provided
+  if (tutor.active && tutor.activeUntil) {
+    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    if (!timeRegex.test(tutor.activeUntil)) {
+      return res.status(400).json({
+        error: "activeUntil must be in HH:MM 24-hour format"
+      });
+    }
   }
 
   // Check if tutor already exists
@@ -29,8 +39,13 @@ app.post("/addTutor", (req, res) => {
   );
 
   if (existingTutor) {
-    // Update active status
+    // Update fields
     existingTutor.active = tutor.active;
+    existingTutor.activeUntil = tutor.activeUntil || null;
+    existingTutor.subjects = tutor.subjects || existingTutor.subjects;
+    existingTutor.hourlyRate = tutor.hourlyRate || existingTutor.hourlyRate;
+    existingTutor.phone = tutor.phone || existingTutor.phone;
+    existingTutor.paypal = tutor.paypal || existingTutor.paypal;
 
     console.log("Updated tutor:", existingTutor);
 
@@ -44,10 +59,11 @@ app.post("/addTutor", (req, res) => {
   const newTutor = {
     name: tutor.name,
     active: tutor.active,
-    subjects: tutor.subjects,
-    hourlyRate: tutor.hourlyRate,
-    phone: tutor.phone,
-    paypal: tutor.paypal
+    activeUntil: tutor.activeUntil || null,
+    subjects: tutor.subjects || [],
+    hourlyRate: tutor.hourlyRate || 0,
+    phone: tutor.phone || "",
+    paypal: tutor.paypal || "",
   };
 
   tutors.push(newTutor);
