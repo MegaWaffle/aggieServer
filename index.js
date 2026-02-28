@@ -42,9 +42,12 @@ app.post("/addTutor", (req, res) => {
 
   // Add new tutor
   const newTutor = {
-    id: Date.now(),
     name: tutor.name,
     active: tutor.active,
+    subjects: tutor.selectedCourses,
+    hourlyRate: tutor.hourlyRate,
+    phone: tutor.phone,
+    paypal: tutor.paypal
   };
 
   tutors.push(newTutor);
