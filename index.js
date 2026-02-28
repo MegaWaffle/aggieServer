@@ -127,7 +127,7 @@ app.post("/requestSession", (req, res) => {
   //   if (remainingMinutes < requestedMinutes) {
   //     return res.status(400).json({ error: "Tutor does not have enough active time left" });
   //   }
-  }
+  // }
 
   const session = { studentName, tutorName, course, requestedMinutes, location, timestamp: new Date() };
   sessions.push(session);
