@@ -117,16 +117,16 @@ app.post("/requestSession", (req, res) => {
   if (!tutor.subjects.includes(course)) return res.status(400).json({ error: "Tutor does not teach this course" });
 
   // Check if tutor has enough time left
-  if (tutor.activeUntil) {
-    const [hour, minute] = tutor.activeUntil.split(":").map(Number);
-    const now = new Date();
-    const activeUntilDate = new Date();
-    activeUntilDate.setHours(hour, minute, 0, 0);
+  // if (tutor.activeUntil) {
+  //   const [hour, minute] = tutor.activeUntil.split(":").map(Number);
+  //   const now = new Date();
+  //   const activeUntilDate = new Date();
+  //   activeUntilDate.setHours(hour, minute, 0, 0);
 
-    const remainingMinutes = Math.floor((activeUntilDate - now) / (1000 * 60));
-    if (remainingMinutes < requestedMinutes) {
-      return res.status(400).json({ error: "Tutor does not have enough active time left" });
-    }
+  //   const remainingMinutes = Math.floor((activeUntilDate - now) / (1000 * 60));
+  //   if (remainingMinutes < requestedMinutes) {
+  //     return res.status(400).json({ error: "Tutor does not have enough active time left" });
+  //   }
   }
 
   const session = { studentName, tutorName, course, requestedMinutes, location, timestamp: new Date() };
