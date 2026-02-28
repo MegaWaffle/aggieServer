@@ -51,15 +51,17 @@ wss.on("connection", (ws) => {
 // ---------------------- Helper: deactivate expired tutors ----------------------
 function deactivateExpiredTutors() {
   const now = new Date();
-  const currentTime = `${now.getHours().toString().padStart(2, "0")}:${now
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   tutors.forEach((tutor) => {
-    if (tutor.active && tutor.activeUntil && currentTime >= tutor.activeUntil) {
-      tutor.active = false;
-      console.log(`Tutor ${tutor.name} deactivated (past activeUntil)`);
+    if (tutor.active && tutor.activeUntil) {
+      const [hour, minute] = tutor.activeUntil.split(":").map(Number);
+      const activeUntilMinutes = hour * 60 + minute;
+
+      if (currentMinutes >= activeUntilMinutes) {
+        tutor.active = false;
+        console.log(`Tutor ${tutor.name} deactivated (past activeUntil)`);
+      }
     }
   });
 }
