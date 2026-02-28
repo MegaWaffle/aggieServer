@@ -99,7 +99,6 @@ app.post("/addTutor", (req, res) => {
 
 // Get all tutors
 app.get("/tutors", (req, res) => {
-  deactivateExpiredTutors();
   res.json(tutors);
 });
 
@@ -111,7 +110,6 @@ app.post("/requestSession", (req, res) => {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
-  deactivateExpiredTutors();
 
   const tutor = tutors.find((t) => t.name.toLowerCase() === tutorName.toLowerCase());
   if (!tutor) return res.status(404).json({ error: "Tutor not found" });
