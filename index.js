@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
-const { Server } = require("socket.io");
+const WebSocket = require("ws");
 
 const app = express();
 app.use(cors());
@@ -11,34 +11,39 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
-// Socket.IO server with CORS for any origin (adjust in production)
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
+// ---------------------- WebSocket Server ----------------------
+const wss = new WebSocket.Server({ server });
 
 // In-memory storage
 let tutors = [];
-let tutorSockets = {}; // map tutorName -> socket.id
-let sessions = []; // store session requests
+let tutorSockets = {}; // tutorName -> ws socket
+let sessions = [];
 
-// ---------------------- Socket.IO Logic ----------------------
+// ---------------------- WS Logic ----------------------
+wss.on("connection", (ws) => {
+  console.log("New client connected");
 
-// Tutor connects and registers
-io.on("connection", (socket) => {
-  console.log("New client connected:", socket.id);
+  // Expect first message to be tutor registration
+  ws.on("message", (message) => {
+    try {
+      const data = JSON.parse(message);
 
-  socket.on("registerTutor", (tutorName) => {
-    tutorSockets[tutorName.toLowerCase()] = socket.id;
-    console.log(`Tutor registered: ${tutorName} -> ${socket.id}`);
+      // Register tutor
+      if (data.type === "registerTutor" && data.tutorName) {
+        const nameKey = data.tutorName.toLowerCase();
+        tutorSockets[nameKey] = ws;
+        ws.tutorName = nameKey;
+        console.log(`Tutor registered: ${data.tutorName}`);
+      }
+    } catch (err) {
+      console.log("Invalid WS message:", message);
+    }
   });
 
-  socket.on("disconnect", () => {
-    for (const [name, id] of Object.entries(tutorSockets)) {
-      if (id === socket.id) {
-        console.log(`Tutor disconnected: ${name}`);
-        delete tutorSockets[name];
-        break;
-      }
+  ws.on("close", () => {
+    if (ws.tutorName && tutorSockets[ws.tutorName] === ws) {
+      console.log(`Tutor disconnected: ${ws.tutorName}`);
+      delete tutorSockets[ws.tutorName];
     }
   });
 });
@@ -127,10 +132,10 @@ app.post("/requestSession", (req, res) => {
   const session = { studentName, tutorName, course, requestedMinutes, location, timestamp: new Date() };
   sessions.push(session);
 
-  // Relay to tutor if connected
-  const tutorSocketId = tutorSockets[tutorName.toLowerCase()];
-  if (tutorSocketId) {
-    io.to(tutorSocketId).emit("newSessionRequest", session);
+  // Relay via WS if connected
+  const ws = tutorSockets[tutorName.toLowerCase()];
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "newSessionRequest", session }));
     console.log(`Relayed session request to ${tutorName}`);
   } else {
     console.log(`Tutor ${tutorName} not connected, request queued`);
