@@ -44,7 +44,7 @@ app.post("/addTutor", (req, res) => {
   const newTutor = {
     name: tutor.name,
     active: tutor.active,
-    subjects: tutor.selectedCourses,
+    subjects: tutor.subjects,
     hourlyRate: tutor.hourlyRate,
     phone: tutor.phone,
     paypal: tutor.paypal
